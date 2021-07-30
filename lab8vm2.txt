@@ -1,0 +1,168 @@
+Fri Jul 30 17:40:27 EDT 2021
+
+hostname:pri-dns
+
+SELinux status:Enforcing
+
+INTERFACES
+TYPE=Ethernet
+PROXY_METHOD=none
+BROWSER_ONLY=no
+BOOTPROTO=dhcp
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=no
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+IPV6_ADDR_GEN_MODE=stable-privacy
+NAME=ens192
+UUID=29b6e258-0ffd-4ee3-8f2d-2126105eee4f
+DEVICE=ens192
+ONBOOT=yes
+TYPE=Ethernet
+PROXY_METHOD=none
+BROWSER_ONLY=no
+BOOTPROTO=none
+IPADDR=192.168.17.2
+GATEWAY=192.168.17.1
+DNS1=192.168.17.0
+PREFIX=24
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+IPV6_ADDR_GEN_MODE=stable-privacy
+NAME=ens224
+UUID=61048579-375a-3255-bd21-9214292bdb10
+DEVICE=ens224
+ONBOOT=yes
+AUTOCONNECT_PRIORITY=-999
+
+Firewall configuration
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: ens192 ens224
+  sources: 
+  services: cockpit dhcpv6-client dns smtp ssh
+  ports: 53/tcp 53/udp
+  protocols: 
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+UUID:acf5ce23-01 acf5ce23-02 340c51dc-89fd-42e3-9a74-da365fa7f126 913282fd-33f0-4e21-83cc-ff7e97319e38
+
+named:failed
+named:enabled
+
+DNS config
+drwxrwx--T. 7 root named system_u:object_r:named_zone_t:s0 198 Jul 30 16:50 /var/named
+
+total 24
+-rw-r--r--. 1 root  root  unconfined_u:object_r:named_zone_t:s0  259 Jul 24 14:26 192.168.17.db
+drwxr-x---. 7 root  named system_u:object_r:named_conf_t:s0       61 Jun 18 18:10 chroot
+drwxr-x---. 7 root  named system_u:object_r:named_zone_t:s0       61 Jun 18 18:10 chroot_sdb
+drwxrwx---. 2 named named system_u:object_r:named_cache_t:s0     127 Jul 25 03:26 data
+drwxrwx---. 2 named named system_u:object_r:named_cache_t:s0      60 Jul 30 03:50 dynamic
+-rw-r-----. 1 root  named system_u:object_r:named_conf_t:s0     2253 May 27 16:49 named.ca
+-rw-r-----. 1 root  named system_u:object_r:named_zone_t:s0      152 May 27 16:49 named.empty
+-rw-r-----. 1 root  named system_u:object_r:named_zone_t:s0      152 May 27 16:49 named.localhost
+-rw-r-----. 1 root  named system_u:object_r:named_zone_t:s0      168 May 27 16:49 named.loopback
+-rw-r--r--. 1 root  root  unconfined_u:object_r:named_zone_t:s0  270 Jul 24 14:26 pri-dns.db
+drwxrwx---. 2 named named system_u:object_r:named_cache_t:s0       6 May 27 16:49 slaves
+
+SEBool
+named_write_master_zones --> on
+
+named config
+//
+// named.conf
+//
+// Provided by Red Hat bind package to configure the ISC BIND named(8) DNS
+// server as a caching only nameserver (as a localhost DNS resolver only).
+//
+// See /usr/share/doc/bind*/sample/ for example named configuration files.
+//
+
+options {
+	listen-on port 53 { 127.0.0.1; 192.168.17.2; };
+	listen-on-v6 port 53 { ::1; };
+	directory 	"/var/named";
+	dump-file 	"/var/named/data/cache_dump.db";
+	statistics-file "/var/named/data/named_stats.txt";
+	memstatistics-file "/var/named/data/named_mem_stats.txt";
+	secroots-file	"/var/named/data/named.secroots";
+	recursing-file	"/var/named/data/named.recursing";
+	allow-query     { localhost; 192.168.17.0/24;  };
+
+	/* 
+	 - If you are building an AUTHORITATIVE DNS server, do NOT enable recursion.
+	 - If you are building a RECURSIVE (caching) DNS server, you need to enable 
+	   recursion. 
+	 - If your recursive DNS server has a public IP address, you MUST enable access 
+	   control to limit queries to your legitimate users. Failing to do so will
+	   cause your server to become part of large scale DNS amplification 
+	   attacks. Implementing BCP38 within your network would greatly
+	   reduce such attack surface 
+	*/
+	recursion yes;
+
+	dnssec-enable yes;
+	dnssec-validation yes;
+
+	managed-keys-directory "/var/named/dynamic";
+
+	pid-file "/run/named/named.pid";
+	session-keyfile "/run/named/session.key";
+
+	/* https://fedoraproject.org/wiki/Changes/CryptoPolicy */
+	include "/etc/crypto-policies/back-ends/bind.config";
+};
+
+logging {
+        channel default_debug {
+                file "data/named.run";
+                severity dynamic;
+        };
+};
+
+zone "." IN {
+	type hint;
+	file "named.ca";
+};
+
+include "/etc/named.rfc1912.zones";
+include "/etc/named.root.key";
+//Forward Zone
+zone "pri-dns" IN { //Domain Name
+	type master;
+	file "pri-dns.db";
+	allow-update { none; };
+	inline-signing yes;
+	auto-dnssec maintain;
+	key-directory “/etc/named/pri-dns-keys”;
+};
+//Reverse Zone
+zone "2.17.168.192.in-addr.arpa" IN { //Reverse Zone Name
+	type master;
+	file "192.168.17.db";
+	allow-update { none; };
+	inline-signing yes;
+	auto-dnssec maintain;
+	key-directory “/etc/named/2.17.168.192-keys”;
+};
+
+
+keys
+
+DNSSec records
+
+; <<>> DiG 9.11.26-RedHat-9.11.26-4.el8_4 <<>> AXFR @127.0.0.1
+; (1 server found)
+;; global options: +cmd
+;; connection timed out; no servers could be reached
